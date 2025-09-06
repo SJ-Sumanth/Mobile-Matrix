@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Brand model for phone manufacturers
+model Brand {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  logoUrl     String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  phones Phone[]
+
+  @@map("brands")
+}
+
+// Main phone model
+model Phone {
+  id           String            @id @default(cuid())
+  brandId      String
+  model        String
+  variant      String?
+  slug         String            @unique
+  launchDate   DateTime?
+  availability PhoneAvailability @default(AVAILABLE)
+  mrp          Float?
+  currentPrice Float?
+  currency     String            @default("INR")
+  images       String[]
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  brand         Brand              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  specifications PhoneSpecification?
+  comparisons1  PhoneComparison[]  @relation("Phone1Comparisons")
+  comparisons2  PhoneComparison[]  @relation("Phone2Comparisons")
+
+  @@unique([brandId, model, variant])
+  @@map("phones")
+}
+
+// Phone specifications model
+model PhoneSpecification {
+  id      String @id @default(cuid())
+  phoneId String @unique
+
+  // Display specifications
+  displaySize       String?
+  displayResolution String?
+  displayType       String?
+  refreshRate       Int?
+  brightness        Int?
+
+  // Camera specifications
+  rearCameraMain    String?
+  rearCameraUltra   String?
+  rearCameraTele    String?
+  rearCameraDepth   String?
+  frontCamera       String?
+  cameraFeatures    String[]
+
+  // Performance specifications
+  processor         String?
+  gpu               String?
+  ramOptions        String[]
+  storageOptions    String[]
+  expandableStorage Boolean  @default(false)
+
+  // Battery specifications
+  batteryCapacity   Int?
+  chargingSpeed     Int?
+  wirelessCharging  Boolean @default(false)
+
+  // Connectivity specifications
+  networkSupport String[]
+  wifi           String?
+  bluetooth      String?
+  nfc            Boolean @default(false)
+
+  // Build specifications
+  dimensions       String?
+  weight           String?
+  materials        String[]
+  colors           String[]
+  waterResistance  String?
+
+  // Software specifications
+  operatingSystem String?
+  osVersion       String?
+  updateSupport   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  phone Phone @relation(fields: [phoneId], references: [id], onDelete: Cascade)
+
+  @@map("phone_specifications")
+}
+
+// Chat session model for AI conversations
+model ChatSession {
+  id                String    @id @default(cuid())
+  sessionId         String    @unique
+  userId            String?
+  currentStep       ChatStep  @default(BRAND_SELECTION)
+  selectedBrand     String?
+  selectedPhones    String[]
+  preferences       Json?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  messages    ChatMessage[]
+  comparisons PhoneComparison[]
+
+  @@map("chat_sessions")
+}
+
+// Chat message model
+model ChatMessage {
+  id            String      @id @default(cuid())
+  chatSessionId String
+  role          MessageRole
+  content       String
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+
+  chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+// Phone comparison model
+model PhoneComparison {
+  id            String   @id @default(cuid())
+  chatSessionId String?
+  phone1Id      String
+  phone2Id      String
+  result        Json?
+  insights      String[]
+  overallWinner String?
+  shareToken    String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  chatSession ChatSession? @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
+  phone1      Phone        @relation("Phone1Comparisons", fields: [phone1Id], references: [id], onDelete: Cascade)
+  phone2      Phone        @relation("Phone2Comparisons", fields: [phone2Id], references: [id], onDelete: Cascade)
+
+  @@unique([phone1Id, phone2Id])
+  @@map("phone_comparisons")
+}
+
+// Enums
+enum PhoneAvailability {
+  AVAILABLE
+  DISCONTINUED
+  UPCOMING
+}
+
+enum ChatStep {
+  BRAND_SELECTION
+  MODEL_SELECTION
+  COMPARISON
+  COMPLETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
